@@ -15,6 +15,59 @@ Before touching any feature, understand the hierarchy:
 **Goal:** Know the difference between an Organization and a Project, and pick the right process template.
 
 ---
+### What a Process Template Controls
+
+A process template decides:
+- What **work item types** exist (Epic, Feature, Bug, User Story, PBI, etc.)
+- What **fields** appear on each work item (e.g., "Story Points" vs "Effort" vs "Size")
+- What the **default Kanban board columns/states** look like
+- The overall **workflow states** a work item moves through (New → Active → Resolved → Closed, etc.)
+
+It does **not** change Repos, Pipelines, or Artifacts — those work the same regardless of process.
+
+### The Four Templates
+
+**1. Basic**
+- Work item types: Issue, Task, Epic
+- Best for: Small teams, simple projects, or people new to Azure DevOps who don't want ceremony.
+- A simple to-do/tracking system, no formal "sprint" backlog terminology.
+
+**2. Agile**
+- Work item types: Epic → Feature → User Story → Task, plus Bug
+- Best for: Teams following general Agile practices (not strict Scrum).
+- Field naming: "User Story," "Story Points," "Effort."
+- The most commonly used template for typical software teams.
+
+**3. Scrum**
+- Work item types: Epic → Feature → Product Backlog Item (PBI) → Task, plus Bug
+- Best for: Teams strictly following Scrum ceremonies (Sprint Planning, Sprint Review, etc.)
+- Field naming: "Product Backlog Item" instead of "User Story."
+- Agile template's stricter, Scrum-terminology cousin.
+
+**4. CMMI (Capability Maturity Model Integration)**
+- Work item types: Epic → Feature → Requirement → Task, plus Bug, Change Request, Risk, Review
+- Best for: Larger, formal, compliance-heavy organizations (government, regulated industries) needing detailed traceability and change control.
+- The heaviest, most process-rigorous template — more overhead, more auditability.
+
+### Quick Comparison Table
+
+| Template | Work Items | Ceremony Level | Typical Use |
+|---|---|---|---|
+| Basic | Issue, Task, Epic | Minimal | Small teams, quick projects |
+| Agile | Epic, Feature, User Story, Task, Bug | Medium | Most general software teams |
+| Scrum | Epic, Feature, PBI, Task, Bug | Medium-High | Teams strictly doing Scrum |
+| CMMI | Epic, Feature, Requirement, Task, Bug, Risk, Review, Change Request | High | Enterprise/regulated environments |
+
+### Practical Advice
+
+- **Learning or starting a new small-to-mid project:** pick **Agile** — most widely used, most tutorials/community support.
+- **Team runs formal Scrum sprints with a Scrum Master:** pick **Scrum** for terminology alignment.
+- **Regulated industry needing audit trails:** pick **CMMI**.
+- **Want the simplest possible tracking:** pick **Basic**.
+
+⚠️ **Important catch:** once a project is created, you generally **can't change its process template** (migrating work items manually is possible but painful). Decide deliberately rather than defaulting to whatever's pre-selected.
+
+---
 
 ## Step 2: Azure Boards (Work Tracking)
 
