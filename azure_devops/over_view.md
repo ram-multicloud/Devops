@@ -3,7 +3,15 @@
 A structured learning path for Azure DevOps, organized from fundamentals to advanced topics. Follow the steps in order — each builds on the previous one.
 
 ---
-
+```
+Organization
+ └── Project(s)
+      ├── Boards        (work tracking)
+      ├── Repos         (source control)
+      ├── Pipelines     (CI/CD)
+      ├── Test Plans    (manual + exploratory testing)
+      └── Artifacts     (package feeds)
+```
 ## Step 1: Core Fundamentals
 
 Before touching any feature, understand the hierarchy:
