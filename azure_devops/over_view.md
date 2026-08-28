@@ -2,7 +2,12 @@
 
 A structured learning path for Azure DevOps, organized from fundamentals to advanced topics. Follow the steps in order — each builds on the previous one.
 
----
+- [Refer Here](https://azure.microsoft.com/en-us/products/devops) for the Azure DevOps product page
+- Azure DevOps offers services to manage the complete project lifecycle: requirements, design, code, tests, artifacts, pipelines, and tracking
+- Azure DevOps is offered in two modes:
+  - **Azure DevOps Services** – cloud-hosted, offers free and paid plans, integrates with an Azure account ([pricing](https://azure.microsoft.com/en-us/pricing/details/devops/azure-devops-services/))
+  - **Azure DevOps Server** – self-hosted, on-premises option
+
 ```
 Organization
  └── Project(s)
@@ -12,6 +17,9 @@ Organization
       ├── Test Plans    (manual + exploratory testing)
       └── Artifacts     (package feeds)
 ```
+
+---
+
 ## Step 1: Core Fundamentals
 
 Before touching any feature, understand the hierarchy:
@@ -22,10 +30,10 @@ Before touching any feature, understand the hierarchy:
 
 **Goal:** Know the difference between an Organization and a Project, and pick the right process template.
 
----
 ### What a Process Template Controls
 
 A process template decides:
+
 - What **work item types** exist (Epic, Feature, Bug, User Story, PBI, etc.)
 - What **fields** appear on each work item (e.g., "Story Points" vs "Effort" vs "Size")
 - What the **default Kanban board columns/states** look like
@@ -59,12 +67,12 @@ It does **not** change Repos, Pipelines, or Artifacts — those work the same re
 
 ### Quick Comparison Table
 
-| Template | Work Items | Ceremony Level | Typical Use |
-|---|---|---|---|
-| Basic | Issue, Task, Epic | Minimal | Small teams, quick projects |
-| Agile | Epic, Feature, User Story, Task, Bug | Medium | Most general software teams |
-| Scrum | Epic, Feature, PBI, Task, Bug | Medium-High | Teams strictly doing Scrum |
-| CMMI | Epic, Feature, Requirement, Task, Bug, Risk, Review, Change Request | High | Enterprise/regulated environments |
+| Template | Work Items                                                          | Ceremony Level | Typical Use                       |
+| -------- | ------------------------------------------------------------------- | -------------- | --------------------------------- |
+| Basic    | Issue, Task, Epic                                                   | Minimal        | Small teams, quick projects       |
+| Agile    | Epic, Feature, User Story, Task, Bug                                | Medium         | Most general software teams       |
+| Scrum    | Epic, Feature, PBI, Task, Bug                                       | Medium-High    | Teams strictly doing Scrum        |
+| CMMI     | Epic, Feature, Requirement, Task, Bug, Risk, Review, Change Request | High           | Enterprise/regulated environments |
 
 ### Practical Advice
 
@@ -112,21 +120,55 @@ This is usually the most important skill for DevOps roles.
 - **Continuous Integration (CI)**: Automatically build/test code on every push.
 - **Continuous Deployment (CD)**: Automatically deploy to environments (Dev, QA, Prod) after a successful build.
 - **Pipeline types**:
-  - **YAML pipelines** (modern, code-as-config, stored in repo as `azure-pipelines.yml`) — learn this primarily.
+  - **YAML pipelines** (modern, code-as-config, stored in repo as `azure-pipelines.yml`) — learn this primarily. [Refer Here](https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/?view=azure-pipelines) for the YAML schema.
   - **Classic pipelines** (UI-based, older approach) — good to know but less used now.
 - **Key YAML concepts**:
   - `trigger` – what starts the pipeline (branch push, PR, schedule)
   - `pool` – the agent/VM that runs the job
   - `stages`, `jobs`, `steps` – the structure of a pipeline
-  - `tasks` – built-in or marketplace actions (e.g., `AzureCLI@2`, `DotNetCoreCLI@2`)
+  - `tasks` – built-in or marketplace actions (e.g., `AzureCLI@2`, `DotNetCoreCLI@2`) — [full task reference](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/?view=azure-pipelines)
   - `variables` and `variable groups` – reusable/config values
   - `templates` – reusable YAML snippets across pipelines
 - **Environments**: Target deployment destinations with approval gates.
 - **Service Connections**: Secure credentials to connect to Azure, AWS, Docker Hub, etc.
 - **Artifacts (build output)**: Files published from a build stage, consumed by release/deploy stages.
-- **Self-hosted vs Microsoft-hosted agents**: Where pipeline jobs actually run.
+- **Agents**: [Microsoft-hosted agents](https://learn.microsoft.com/en-us/azure/devops/pipelines/agents/hosted?view=azure-devops&tabs=windows-images%2Cyaml) vs self-hosted agents — where pipeline jobs actually run.
 
 **Goal:** Write a simple YAML pipeline that builds an app, runs tests, and deploys it to one environment with an approval gate.
+
+**Sample pipeline**
+
+```yaml
+name: 'spring petclinic build'
+# where to run
+pool:
+  vmImage: ubuntu-latest
+# when to run
+trigger:
+  - main
+# pr:
+#   - main
+# schedules:
+#   - cron: '0 0 * * *'
+#     displayName: Daily midnight build
+#     branches:
+#       include:
+#       - main
+stages:
+  - stage: ci
+    displayName: Build Spring petclinic
+    jobs:
+      - job: cijob
+        displayName: build spring petclinic using maven
+        steps:
+          - task: Maven@4
+            inputs:
+              mavenPOMFile: 'pom.xml'
+              goals: 'package'
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              publishJUnitResults: true
+              jdkVersionOption: '1.21'
+```
 
 ---
 
@@ -189,6 +231,7 @@ This is usually the most important skill for DevOps roles.
 ## Hands-On Practice Idea
 
 Build one small project end-to-end:
+
 1. Create a Project → add a Backlog item → move it on the Board.
 2. Create a feature branch → commit code → open a PR (with a branch policy requiring 1 reviewer).
 3. Write a YAML pipeline that builds the app and runs tests on every PR.
