@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  nop:
+    image: nop:1.0
+    container_name: nop
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - nopnet
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mysql-container
+    restart: unless-stopped
+
+  mysql-container:
+    image: mysql:8.0
+    container_name: mysql-container
+    environment:
+      MYSQL_ROOT_PASSWORD: my-secret-pw
+    networks:
+      - nopnet
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+
+networks:
+  nopnet:
+    driver: bridge
+
+volumes:
+  mysql-data:
