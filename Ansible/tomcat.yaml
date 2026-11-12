@@ -1,0 +1,204 @@
+---
+# Install Apache Tomcat 10 on Ubuntu 20.04
+# Run:  ansible-playbook -i inventory.ini install_tomcat10.yml --ask-vault-pass
+# Inventory group expected: [tomcat_servers]
+
+- name: Install and configure Apache Tomcat 10
+  hosts: tomcat_servers
+  become: true
+  vars:
+    tomcat_version: "10.1.61"            # change to any version listed at archive.apache.org/dist/tomcat/tomcat-10/
+    tomcat_user: tomcat
+    tomcat_group: tomcat
+    tomcat_home: /opt/tomcat
+    tomcat_http_port: 8080
+    java_home: /usr/lib/jvm/java-1.11.0-openjdk-amd64   # default-jdk on Ubuntu 20.04 = OpenJDK 11
+    tomcat_java_opts: "-Xms512M -Xmx1024M -server -XX:+UseParallelGC"
+
+    tomcat_base_url: "https://archive.apache.org/dist/tomcat/tomcat-10/v{{ tomcat_version }}/bin"
+    tomcat_archive: "apache-tomcat-{{ tomcat_version }}.tar.gz"
+
+    # Manager / Host-Manager web UI users (store the password in ansible-vault!)
+    tomcat_admin_user: admin
+    tomcat_admin_password: "{{ vault_tomcat_admin_password | default('ChangeMe-Now!') }}"
+
+    # Uncomment to allow remote access to /manager and /host-manager.
+    # 10.1.x uses RemoteCIDRValve (CIDR list); 10.0.x uses RemoteAddrValve (regex).
+    # tomcat_manager_allow: "127.0.0.0/8,::1/128,203.0.113.0/24"
+
+    tomcat_manage_ufw: true              # open the HTTP port in UFW (does not enable UFW)
+
+  tasks:
+    - name: Update apt cache and install Java
+      ansible.builtin.apt:
+        name: default-jdk
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create tomcat group
+      ansible.builtin.group:
+        name: "{{ tomcat_group }}"
+        system: true
+
+    - name: Create tomcat user (no login shell)
+      ansible.builtin.user:
+        name: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        home: "{{ tomcat_home }}"
+        shell: /bin/false
+        system: true
+        create_home: false
+
+    - name: Create install directory
+      ansible.builtin.file:
+        path: "{{ tomcat_home }}"
+        state: directory
+        owner: root
+        group: "{{ tomcat_group }}"
+        mode: "0755"
+
+    - name: Download Tomcat archive (verified with SHA-512)
+      ansible.builtin.get_url:
+        url: "{{ tomcat_base_url }}/{{ tomcat_archive }}"
+        dest: "/tmp/{{ tomcat_archive }}"
+        checksum: "sha512:{{ tomcat_base_url }}/{{ tomcat_archive }}.sha512"
+        mode: "0644"
+
+    - name: Extract Tomcat into {{ tomcat_home }}
+      ansible.builtin.unarchive:
+        src: "/tmp/{{ tomcat_archive }}"
+        dest: "{{ tomcat_home }}"
+        remote_src: true
+        extra_opts: ["--strip-components=1"]
+        creates: "{{ tomcat_home }}/bin/catalina.sh"
+      notify: Restart tomcat
+
+    - name: Give tomcat group read access to conf/ and traverse permission on the dir
+      ansible.builtin.file:
+        path: "{{ tomcat_home }}/conf"
+        state: directory
+        group: "{{ tomcat_group }}"
+        mode: "g+r"
+        recurse: true
+
+    - name: Allow group to enter conf/
+      ansible.builtin.file:
+        path: "{{ tomcat_home }}/conf"
+        state: directory
+        mode: "g+x"
+
+    - name: Make runtime directories owned by tomcat
+      ansible.builtin.file:
+        path: "{{ tomcat_home }}/{{ item }}"
+        state: directory
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        recurse: true
+      loop: [webapps, work, temp, logs]
+
+    - name: Install systemd unit file
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/tomcat.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Apache Tomcat Web Application Container
+          After=network.target
+
+          [Service]
+          Type=forking
+
+          User={{ tomcat_user }}
+          Group={{ tomcat_group }}
+
+          Environment="JAVA_HOME={{ java_home }}"
+          Environment="JAVA_OPTS=-Djava.security.egd=file:///dev/urandom"
+          Environment="CATALINA_BASE={{ tomcat_home }}"
+          Environment="CATALINA_HOME={{ tomcat_home }}"
+          Environment="CATALINA_PID={{ tomcat_home }}/temp/tomcat.pid"
+          Environment="CATALINA_OPTS={{ tomcat_java_opts }}"
+
+          ExecStart={{ tomcat_home }}/bin/startup.sh
+          ExecStop={{ tomcat_home }}/bin/shutdown.sh
+
+          RestartSec=10
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      notify:
+        - Reload systemd
+        - Restart tomcat
+
+    - name: Configure manager-gui and admin-gui users
+      ansible.builtin.blockinfile:
+        path: "{{ tomcat_home }}/conf/tomcat-users.xml"
+        insertbefore: "</tomcat-users>"
+        marker: "<!-- {mark} ANSIBLE MANAGED TOMCAT USERS -->"
+        block: |
+          <role rolename="manager-gui"/>
+          <role rolename="admin-gui"/>
+          <user username="{{ tomcat_admin_user }}" password="{{ tomcat_admin_password }}" roles="manager-gui,admin-gui"/>
+      no_log: true
+      notify: Restart tomcat
+
+    - name: Adjust remote-access valve for Manager and Host Manager
+      ansible.builtin.replace:
+        path: "{{ tomcat_home }}/webapps/{{ item }}/META-INF/context.xml"
+        regexp: '(<Valve className="org\.apache\.catalina\.valves\.Remote\w+Valve"[^>]*?\s)allow="[^"]*"'
+        replace: '\1allow="{{ tomcat_manager_allow }}"'
+      loop: [manager, host-manager]
+      when: tomcat_manager_allow is defined
+      notify: Restart tomcat
+
+    - name: Open Tomcat port in UFW
+      when: tomcat_manage_ufw | bool
+      block:
+        - name: Ensure ufw is installed
+          ansible.builtin.apt:
+            name: ufw
+            state: present
+
+        - name: Allow Tomcat HTTP port
+          community.general.ufw:
+            rule: allow
+            port: "{{ tomcat_http_port | string }}"
+            proto: tcp
+
+    - name: Flush handlers so Tomcat starts with final config
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and start Tomcat
+      ansible.builtin.systemd:
+        name: tomcat
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Wait for Tomcat to listen
+      ansible.builtin.wait_for:
+        port: "{{ tomcat_http_port }}"
+        delay: 5
+        timeout: 60
+
+    - name: Verify Tomcat responds on localhost
+      ansible.builtin.uri:
+        url: "http://localhost:{{ tomcat_http_port }}/"
+        status_code: 200
+      register: tomcat_check
+      retries: 5
+      delay: 5
+      until: tomcat_check.status == 200
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart tomcat
+      ansible.builtin.systemd:
+        name: tomcat
+        state: restarted
